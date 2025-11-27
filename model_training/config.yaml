@@ -1,0 +1,38 @@
+# 模型训练配置文件
+
+# 模型配置
+model:
+  name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  num_classes: 3
+  use_features: false
+  feature_dim: 4
+  dropout: 0.1
+
+# 数据配置
+data:
+  dataset_name: "nkazi/SciEntsBank"
+  max_length: 512
+  label_scheme: "3way"  # 5way, 3way, or 2way
+
+# 训练配置
+training:
+  output_dir: "./outputs"
+  batch_size: 16
+  learning_rate: 2e-5
+  num_epochs: 5
+  warmup_steps: 100
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 100
+  
+# 损失函数配置
+loss:
+  alpha: 0.5  # 分类损失权重
+  beta: 0.5   # 回归损失权重
+
+# 评估配置
+evaluation:
+  metric_for_best_model: "f1_weighted"
+  greater_is_better: true
+  save_total_limit: 3
+
