@@ -39,7 +39,7 @@ const Header = () => (
     <h1>Student Homework</h1>
     <div className="user-info">
       <span>Welcome</span>
-      <div className="avatar">李</div>
+      <div className="avatar">Name</div>
     </div>
   </header>
 );
