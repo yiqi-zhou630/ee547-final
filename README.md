@@ -67,3 +67,34 @@ ee547-final/
 ├── docker-compose.yml        # 本地开发时起 DB + Redis/SQS mock + API + worker
 ├── Dockerfile                # 部署到 ECS/EC2 用
 └── README.md
+```
+
+1. Download PostgreSQL and set a password during installation.
+
+2. Install dependencies in the root directory:
+
+pip install fastapi "uvicorn[standard]" SQLAlchemy pydantic pydantic-settings
+
+pip install "passlib[bcrypt]" "python-jose[cryptography]"
+
+pip install psycopg2-binary
+
+pip install python-multipart
+
+3. Start the database:
+
+"D:\PostgreSQL\16\bin\psql.exe" -U postgres
+
+After entering the password:
+
+CREATE USER ee547_user WITH PASSWORD 'ee547_pass';
+
+CREATE DATABASE ee547_db OWNER ee547_user;
+
+Type \q to exit the database.
+
+4. Start Fastapi:
+
+uvicorn app.main:app --reload
+
+Open your browser and access: http://127.0.0.1:8000/docs
