@@ -79,3 +79,23 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+def get_current_teacher(current_user: User = Depends(get_current_user)) -> User:
+    """确保当前用户是教师"""
+    if current_user.role != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teachers can access this resource",
+        )
+    return current_user
+
+
+def get_current_student(current_user: User = Depends(get_current_user)) -> User:
+    """确保当前用户是学生"""
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can access this resource",
+        )
+    return current_user

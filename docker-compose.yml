@@ -1,0 +1,57 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  db:
+    image: postgres:15
+    container_name: ee547_postgres
+    environment:
+      POSTGRES_USER: ee547_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ee547_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ee547_user -d ee547_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis（用于任务队列）
+  redis:
+    image: redis:7-alpine
+    container_name: ee547_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 应用（可选，如果想容器化运行）
+  # api:
+  #   build: .
+  #   container_name: ee547_api
+  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - .:/app
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: postgresql+psycopg2://ee547_user:password@db:5432/ee547_db
+  #     REDIS_URL: redis://redis:6379/0
+
+volumes:
+  postgres_data:
+  redis_data:
