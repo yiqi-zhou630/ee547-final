@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Short Answer Grading Support System"
 
     DATABASE_URL: str = (
-        "postgresql+psycopg2://ee547_user:20020630Qq@localhost:5432/ee547_db"
+        "postgresql+psycopg2://ee547_user:password@localhost:5432/ee547_db"
     )
 
     SECRET_KEY: str = "change-me-in-production"
