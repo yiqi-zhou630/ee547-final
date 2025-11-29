@@ -1,10 +1,14 @@
 """
-模型推理脚本
-用于加载训练好的模型进行预测
+Model Inference Script
+Load trained model for prediction
 """
 
-import argparse
 import os
+# Set environment variables to avoid transformers importing tensorflow (not needed for this project)
+os.environ['TRANSFORMERS_NO_TF'] = '1'
+os.environ['TRANSFORMERS_NO_TORCH'] = '0'  # Ensure PyTorch is used
+
+import argparse
 import torch
 from transformers import AutoTokenizer
 from train import MultiTaskCrossEncoder
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScoringModel:
-    """评分模型包装类"""
+    """Scoring Model Wrapper Class"""
     
     def __init__(
         self,
@@ -27,11 +31,11 @@ class ScoringModel:
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.use_features = use_features
         
-        # 加载tokenizer
+        # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         
-        # 加载模型
-        # 首先尝试从保存的配置加载基础模型名称
+        # Load model
+        # First try to load base model name from saved config
         config_path = f"{model_path}/config.json"
         if os.path.exists(config_path):
             import json
@@ -43,15 +47,15 @@ class ScoringModel:
         
         self.model = MultiTaskCrossEncoder(
             model_name=base_model_name,
-            num_classes=3,
+            num_classes=5,  # 5-class classification: correct, contradictory, partially correct but incomplete, irrelevant, non-domain
             use_features=use_features
         )
         
-        # 加载权重
+        # Load weights
         model_file = f"{model_path}/pytorch_model.bin"
         if not os.path.exists(model_file):
             model_file = f"{model_path}/model.safetensors"
-            # 如果使用safetensors，需要使用safetensors库
+            # If using safetensors, need to use safetensors library
             if os.path.exists(model_file):
                 try:
                     from safetensors.torch import load_file
@@ -59,7 +63,7 @@ class ScoringModel:
                     self.model.load_state_dict(state_dict, strict=False)
                 except ImportError:
                     logger.warning("safetensors not installed, trying alternative loading method")
-                    # 尝试直接加载整个模型
+                    # Try to load entire model directly
                     self.model = torch.load(f"{model_path}/model.pt", map_location=self.device)
         else:
             state_dict = torch.load(model_file, map_location=self.device)
@@ -68,8 +72,14 @@ class ScoringModel:
         self.model.to(self.device)
         self.model.eval()
         
-        # 类别名称
-        self.class_names = ['Correct', 'Partial', 'Incorrect']
+        # 5-class category names
+        self.class_names = [
+            'correct',                        # 0: correct
+            'contradictory',                  # 1: contradictory
+            'partially_correct_incomplete',   # 2: partially correct but incomplete
+            'irrelevant',                     # 3: irrelevant
+            'non_domain'                      # 4: non-domain
+        ]
     
     def predict(
         self,
@@ -78,17 +88,17 @@ class ScoringModel:
         student_answer: str
     ) -> Dict[str, float]:
         """
-        预测学生答案的分数和类别
+        Predict score and class for student answer
         
         Args:
-            question: 题目文本
-            reference_answer: 标准答案
-            student_answer: 学生答案
+            question: Question text
+            reference_answer: Reference answer
+            student_answer: Student answer
         
         Returns:
-            包含分数和类别的字典
+            Dictionary containing score and class
         """
-        # 构建输入
+        # Build input
         text_a = f"{question} {reference_answer}"
         text_b = student_answer
         
@@ -102,18 +112,18 @@ class ScoringModel:
             return_tensors='pt'
         )
         
-        # 移动到设备
+        # Move to device
         input_ids = encoded['input_ids'].to(self.device)
         attention_mask = encoded['attention_mask'].to(self.device)
         token_type_ids = encoded.get('token_type_ids', torch.zeros_like(input_ids)).to(self.device)
         
-        # 提取特征（如果使用）
+        # Extract features (if used)
         features = None
         if self.use_features:
             features = self._extract_features(question, reference_answer, student_answer)
             features = torch.tensor([features], dtype=torch.float32).to(self.device)
         
-        # 预测
+        # Predict
         with torch.no_grad():
             outputs = self.model(
                 input_ids=input_ids,
@@ -122,15 +132,15 @@ class ScoringModel:
                 features=features
             )
         
-        # 获取结果
+        # Get results
         logits = outputs['logits']
         score = outputs['score'].item()
         
-        # 获取类别
+        # Get class
         predicted_class = torch.argmax(logits, dim=-1).item()
         class_name = self.class_names[predicted_class]
         
-        # 获取概率
+        # Get probabilities
         probs = torch.softmax(logits, dim=-1).squeeze().cpu().numpy()
         class_probs = {
             self.class_names[i]: float(probs[i])
@@ -149,51 +159,51 @@ class ScoringModel:
         reference_answer: str,
         student_answer: str
     ) -> list:
-        """提取可解释特征"""
-        # 关键词重合率
+        """Extract interpretable features"""
+        # Keyword overlap rate
         ref_words = set(reference_answer.lower().split())
         student_words = set(student_answer.lower().split())
         keyword_overlap = len(ref_words & student_words) / max(len(ref_words), 1)
         
-        # 答案长度比例
+        # Answer length ratio
         length_ratio = len(student_answer) / max(len(reference_answer), 1)
         
-        # Jaccard相似度
+        # Jaccard similarity
         all_words = ref_words | student_words
         if len(all_words) > 0:
             jaccard_similarity = len(ref_words & student_words) / len(all_words)
         else:
             jaccard_similarity = 0.0
         
-        # 流畅度
+        # Fluency
         fluency = min(len(student_answer.split()) / 10.0, 1.0)
         
         return [keyword_overlap, length_ratio, jaccard_similarity, fluency]
 
 
 def main():
-    parser = argparse.ArgumentParser(description='使用训练好的模型进行推理')
+    parser = argparse.ArgumentParser(description='Use trained model for inference')
     parser.add_argument('--model_path', type=str, required=True,
-                       help='模型路径')
+                       help='Model path')
     parser.add_argument('--question', type=str,
-                       help='题目文本')
+                       help='Question text')
     parser.add_argument('--reference_answer', type=str,
-                       help='标准答案')
+                       help='Reference answer')
     parser.add_argument('--student_answer', type=str,
-                       help='学生答案')
+                       help='Student answer')
     parser.add_argument('--use_features', action='store_true',
-                       help='是否使用可解释特征')
+                       help='Whether to use interpretable features')
     
     args = parser.parse_args()
     
-    # 加载模型
-    logger.info(f"正在加载模型: {args.model_path}")
+    # Load model
+    logger.info(f"Loading model: {args.model_path}")
     model = ScoringModel(
         model_path=args.model_path,
         use_features=args.use_features
     )
     
-    # 如果提供了输入，进行预测
+    # If input is provided, make prediction
     if args.question and args.reference_answer and args.student_answer:
         result = model.predict(
             args.question,
@@ -201,15 +211,15 @@ def main():
             args.student_answer
         )
         
-        print("\n预测结果:")
-        print(f"分数: {result['score']}/5.0")
-        print(f"类别: {result['class']}")
-        print(f"类别概率:")
+        print("\nPrediction Results:")
+        print(f"Score: {result['score']}/5.0")
+        print(f"Class: {result['class']}")
+        print(f"Class Probabilities:")
         for class_name, prob in result['class_probabilities'].items():
             print(f"  {class_name}: {prob:.4f}")
     else:
-        print("请提供 --question, --reference_answer, --student_answer 参数进行预测")
-        print("\n示例用法:")
+        print("Please provide --question, --reference_answer, --student_answer arguments for prediction")
+        print("\nExample usage:")
         print("python inference.py --model_path ./outputs/final_model \\")
         print("  --question 'How did you separate the salt from the water?' \\")
         print("  --reference_answer 'The water was evaporated, leaving the salt.' \\")

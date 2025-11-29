@@ -1,5 +1,5 @@
 """
-模型训练模块
+Model Training Module
 """
 
 from .train import MultiTaskCrossEncoder, SciEntsBankDataset, MultiTaskTrainer
