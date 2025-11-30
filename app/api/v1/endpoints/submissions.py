@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.submission import Submission
 from app.models.question import Question
 from app.models.user import User
-from app.schemas.submission import SubmissionCreate, SubmissionUpdate, SubmissionPublic
+from app.schemas.submission import SubmissionCreate, SubmissionUpdate, SubmissionPublic, SubmissionDetail
 from app.core.security import get_current_user, get_current_student, get_current_teacher
 
 router = APIRouter()

@@ -72,12 +72,17 @@ def login_for_access_token(
 
 
 # 版本二（可选）：兼容 OAuth2PasswordBearer 的表单方式
-# 如果用 swagger 里自动生成的“Authorize”按钮，可以用这个
+# 如果用 swagger 里自动生成的"Authorize"按钮，可以用这个
 @router.post("/token", response_model=Token)
 def login_for_access_token_form(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    """
+    OAuth2 标准登录接口
+    
+    注意：username 字段请填写邮箱地址
+    """
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(

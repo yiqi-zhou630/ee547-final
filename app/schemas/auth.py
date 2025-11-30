@@ -19,7 +19,7 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-    name: str | None = None
+    name: str  # 必填，可以重复
     role: str  # "teacher" / "student"
 
 
@@ -27,7 +27,7 @@ class UserPublic(BaseModel):
 
     id: int
     email: EmailStr
-    name: str | None = None
+    name: str
     role: str
 
     model_config = ConfigDict(from_attributes=True)
