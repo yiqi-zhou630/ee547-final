@@ -10,15 +10,18 @@ from app.api.v1.endpoints import auth, users, questions, submissions, scores, he
 app = FastAPI(title=settings.PROJECT_NAME)
 
 # CORS 配置（允许前端跨域请求）
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应该指定具体域名
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 @app.on_event("startup")
 def on_startup():
     """应用启动时创建数据库表"""

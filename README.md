@@ -69,6 +69,7 @@ ee547-final/
 └── README.md
 ```
 
+```text
 1. Download PostgreSQL and set a password during installation.
 
 2. Install dependencies in the root directory:
@@ -99,76 +100,84 @@ uvicorn app.main:app --reload
 
 Open your browser and access: http://127.0.0.1:8000/docs
 
----
+5. Start Frontend (Optional)
 
-## 快速启动指南
+cd frontend
+npm install
+npm start
 
-### 方式一：使用 Docker (推荐)
-
-1. **启动 Docker Desktop**
-   - 打开 Windows 上的 Docker Desktop 应用
-   - 等待 Docker 启动完成（托盘图标显示绿色）
-
-2. **启动数据库容器**
-   ```powershell
-   # 在项目根目录执行
-   docker-compose up -d
-   
-   # 验证容器状态
-   docker-compose ps
-   ```
-
-3. **安装 Python 依赖**
-   ```powershell
-   # 升级 pip（推荐）
-   python -m pip install --upgrade pip
-   
-   # 安装核心依赖
-   pip install fastapi uvicorn[standard] sqlalchemy "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" "passlib[bcrypt]" python-multipart alembic python-dotenv
-   ```
-
-4. **启动 FastAPI 应用**
-   ```powershell
-   uvicorn app.main:app --reload
-   ```
-
-5. **访问 API 文档**
-   - 浏览器打开: http://127.0.0.1:8000/docs
-
-### 方式二：手动安装 PostgreSQL
-
-如果不想使用 Docker，可以按照上面的步骤 1-4 手动安装 PostgreSQL。
+Open your browser and access: http://127.0.0.1:3000
 
 ---
 
-## 常用 Docker 命令
+## Quick Start with Docker (other choice)
 
-```powershell
-# 查看容器日志
+1. Start Docker Desktop on your Windows machine and wait for it to complete initialization.
+
+2. Start database containers in detached mode:
+
+docker-compose up -d
+
+Verify container status:
+
+docker-compose ps
+
+3. Install Python dependencies (upgrade pip first):
+
+python -m pip install --upgrade pip
+
+pip install fastapi uvicorn[standard] sqlalchemy "psycopg[binary]" pydantic pydantic-settings "python-jose[cryptography]" "passlib[bcrypt]" python-multipart alembic python-dotenv
+
+4. Start FastAPI application:
+
+uvicorn app.main:app --reload
+
+5. Start frontend (Optional):
+
+cd frontend
+npm install
+npm start
+
+6. Access the application:
+   - API Documentation: http://127.0.0.1:8000/docs
+   - Frontend Interface: http://127.0.0.1:3000
+
+---
+
+## Docker Commands
+
+View container logs:
+
 docker-compose logs -f postgres
 
-# 停止所有容器
+Stop all containers:
+
 docker-compose down
 
-# 停止并删除数据（重置数据库）
+Stop and remove all data (reset database):
+
 docker-compose down -v
 
-# 重启容器
+Restart containers:
+
 docker-compose restart
 
-# 进入 PostgreSQL 容器
+Access PostgreSQL container:
+
 docker-compose exec postgres psql -U ee547_user -d ee547_db
-```
 
 ---
 
-## 故障排除
+## Troubleshooting
 
-**问题：pip install 安装 pydantic 失败**
-- 解决：升级 pip 后使用更新版本 `pip install "pydantic>=2.9.0"`
+Issue: pip install pydantic fails
+Solution: Upgrade pip and use newer version: pip install "pydantic>=2.9.0"
 
-**问题：容器启动失败**
-- 解决：确保 Docker Desktop 已启动，端口 5432 和 6379 未被占用
+Issue: bcrypt version incompatibility
+Solution: Install older version: pip install "bcrypt==4.0.1"
 
-**问题：数据库连接失败**
-- 解决：等待 10 秒让容器完全启动，或检查 `docker-compose ps` 确认容器健康状态
+Issue: Docker container fails to start
+Solution: Ensure Docker Desktop is running and ports 5432/6379 are not occupied
+
+Issue: Database connection failed
+Solution: Wait 10 seconds for containers to fully start, or check container health with: docker-compose ps
