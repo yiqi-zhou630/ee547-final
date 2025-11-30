@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import './App.css'; // 引入上面的样式
+import React, { useState, useEffect } from 'react';
+import './App.css';
 
-// 模拟初始数据
+// --- 模拟初始数据 (保持原样) ---
 const INITIAL_DATA = [
   { id: 1, subject: 'ee547', name: 'hw1', date: '2023-10-01', status: 'graded', score: 95 },
   { id: 2, subject: 'ee641', name: 'hw2', date: '2023-10-05', status: 'graded', score: 88 },
@@ -9,43 +9,237 @@ const INITIAL_DATA = [
 ];
 
 function App() {
-  // 状态管理
+  // --- 认证状态管理 ---
+  // 尝试从 localStorage 读取 token，如果存在则说明已登录
+  const [token, setToken] = useState(localStorage.getItem('access_token'));
+
+  // --- 作业数据状态 ---
   const [homeworkList, setHomeworkList] = useState(INITIAL_DATA);
 
-  // 添加作业的处理函数
+  // 登录成功回调
+  const handleLoginSuccess = (accessToken) => {
+    localStorage.setItem('access_token', accessToken);
+    setToken(accessToken);
+  };
+
+  // 注销回调
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    setToken(null);
+  };
+
+  // 添加作业
   const handleAddHomework = (newHomework) => {
-    // 将新作业添加到列表头部
     setHomeworkList([newHomework, ...homeworkList]);
   };
 
+  // 如果没有 Token，显示登录/注册页
+  if (!token) {
+    return <AuthPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // 如果有 Token，显示主 Dashboard
   return (
     <div className="container">
-      <Header />
+      {/* 传递 logout 函数给 Header */}
+      <Header onLogout={handleLogout} />
 
       <div className="main-grid">
-        {/**/}
-        <UploadCard onUpload={handleAddHomework} />
-
-        {/**/}
+        <UploadCard onUpload={handleAddHomework} token={token} />
         <HistoryList homeworks={homeworkList} />
       </div>
     </div>
   );
 }
 
-// --- 子组件：顶部导航 ---
-const Header = () => (
-  <header>
+// --- 新增组件：登录/注册页面 ---
+const AuthPage = ({ onLoginSuccess }) => {
+  const [isLoginView, setIsLoginView] = useState(true); // true: 登录, false: 注册
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // 表单数据
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    role: 'student' // 默认为 student
+  });
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    // 注意：这里假设 React 和 FastAPI 运行在不同端口，你可能需要配置 Proxy
+    // 或者将 '/api' 替换为 'http://localhost:8000/api'
+    const BASE_URL = '/api/v1/auth';
+
+    try {
+      if (isLoginView) {
+        // --- 登录逻辑 ---
+        const response = await fetch(`${BASE_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Login failed');
+
+        // 登录成功，调用父组件回调
+        // 根据后端代码：return Token(access_token=access_token)
+        onLoginSuccess(data.access_token);
+      } else {
+        // --- 注册逻辑 ---
+        const response = await fetch(`${BASE_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            name: formData.name,
+            role: formData.role
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Register failed');
+
+        // 注册成功后，自动切换到登录或直接自动登录
+        alert('Registration successful! Please log in.');
+        setIsLoginView(true);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-container" style={authStyles.container}>
+      <div className="card" style={authStyles.card}>
+        <h2>{isLoginView ? 'Login' : 'Register'}</h2>
+
+        {error && <div style={{color: 'red', marginBottom: '10px'}}>{error}</div>}
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              name="email"
+              type="email"
+              required
+              value={formData.email}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              name="password"
+              type="password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* 注册时额外显示的字段 */}
+          {!isLoginView && (
+            <>
+              <div className="form-group">
+                <label>Full Name</label>
+                <input
+                  name="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select name="role" value={formData.role} onChange={handleChange}>
+                  <option value="student">Student</option>
+                  <option value="teacher">Teacher</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <button type="submit" className="btn-submit" disabled={loading} style={{marginTop: '20px'}}>
+            {loading ? 'Processing...' : (isLoginView ? 'Login' : 'Register')}
+          </button>
+        </form>
+
+        <p style={{marginTop: '15px', textAlign: 'center', fontSize: '0.9rem'}}>
+          {isLoginView ? "Don't have an account? " : "Already have an account? "}
+          <span
+            style={{color: 'blue', cursor: 'pointer', textDecoration: 'underline'}}
+            onClick={() => { setError(''); setIsLoginView(!isLoginView); }}
+          >
+            {isLoginView ? 'Register' : 'Login'}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// --- 简单的内联样式 (仅用于 AuthPage) ---
+const authStyles = {
+  container: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f5f7fa'
+  },
+  card: {
+    width: '100%',
+    maxWidth: '400px',
+    padding: '2rem'
+  }
+};
+
+
+// --- 修改后的 Header (增加 Logout 按钮) ---
+const Header = ({ onLogout }) => (
+  <header style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
     <h1>Student Homework</h1>
-    <div className="user-info">
+    <div className="user-info" style={{display:'flex', alignItems:'center', gap:'1rem'}}>
       <span>Welcome</span>
-      <div className="avatar">Name</div>
+      <div className="avatar">User</div>
+      <button
+        onClick={onLogout}
+        style={{
+          padding: '5px 10px',
+          backgroundColor: '#ff4d4f',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Logout
+      </button>
     </div>
   </header>
 );
 
-// --- 子组件：上传卡片 ---
-const UploadCard = ({ onUpload }) => {
+// --- 原有组件保持不变 (UploadCard, HistoryList, StatusBadge) ---
+// --- 只是 UploadCard 可以接收 token 以备将来真正上传文件使用 ---
+
+const UploadCard = ({ onUpload, token }) => {
   const [subject, setSubject] = useState('');
   const [name, setName] = useState('');
   const [file, setFile] = useState(null);
@@ -63,6 +257,8 @@ const UploadCard = ({ onUpload }) => {
 
     setIsUploading(true);
 
+    // 模拟上传 - 在真实场景中，你会在这里使用 fetch 发送 FormData
+    // 并带上 Authorization: `Bearer ${token}`
     setTimeout(() => {
       const newEntry = {
         id: Date.now(),
@@ -74,8 +270,6 @@ const UploadCard = ({ onUpload }) => {
       };
 
       onUpload(newEntry);
-
-      // 重置表单
       setSubject('');
       setName('');
       setFile(null);
@@ -137,7 +331,6 @@ const UploadCard = ({ onUpload }) => {
   );
 };
 
-// --- 子组件：历史记录列表 ---
 const HistoryList = ({ homeworks }) => {
   return (
     <section className="card">

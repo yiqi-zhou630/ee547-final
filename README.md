@@ -69,6 +69,7 @@ ee547-final/
 └── README.md
 ```
 
+```text
 1. Download PostgreSQL and set a password during installation.
 
 2. Install dependencies in the root directory:
@@ -97,4 +98,14 @@ Type \q to exit the database.
 
 uvicorn app.main:app --reload
 
-Open your browser and access: http://127.0.0.1:8000/docs
+5. Start Frontend
+npm start
+
+6. Start using
+
+Notice: If you encounter a version incompatibility error 
+during registration, install an older version of bcrypt.
+
+pip install "bcrypt==4.0.1"  
+
+Open your browser and access: http://127.0.0.1:3000
