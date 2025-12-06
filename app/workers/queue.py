@@ -19,8 +19,7 @@ _redis_conn: Redis | None = None
 def get_redis_connection() -> Redis:
     global _redis_conn
     if _redis_conn is None:
-        # 如果你用的是 REDIS_URL，把这里改成 settings.REDIS_URL 即可
-        redis_url = settings.QUEUE_URL
+        redis_url = settings.REDIS_URL
         _redis_conn = Redis.from_url(redis_url)
     return _redis_conn
 
