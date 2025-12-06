@@ -1,0 +1,40 @@
+# 模型训练配置文件
+
+# 模型配置
+model:
+  name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  num_classes: 5  # 5分类：正确、矛盾、部分正确但不完整、无关、非领域相关
+  use_features: false
+  feature_dim: 4
+  dropout: 0.1
+
+# 数据配置
+data:
+  dataset_name: "nkazi/SciEntsBank"
+  max_length: 512
+  label_scheme: "5way"  # 使用5分类标签
+  holdout_ratio: 0.3  # 保留部分（hold-out）的比例，用于后续系统测试
+  random_seed: 42  # 随机种子，用于数据打乱和划分
+
+# 训练配置
+training:
+  output_dir: "./outputs"
+  batch_size: 16
+  learning_rate: 2e-5
+  num_epochs: 5
+  warmup_steps: 100
+  save_steps: 500
+  eval_steps: 500
+  logging_steps: 100
+  
+# 损失函数配置
+loss:
+  alpha: 0.5  # 分类损失权重
+  beta: 0.5   # 回归损失权重
+
+# 评估配置
+evaluation:
+  metric_for_best_model: "f1_weighted"
+  greater_is_better: true
+  save_total_limit: 3
+
