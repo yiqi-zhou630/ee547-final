@@ -1,15 +1,20 @@
 # app/workers/worker_main.py
-from rq import Worker, Connection
+from rq import Worker, Queue
 from app.workers.queue import get_redis_connection
+from app.workers.queue import _SCORING_QUEUE_NAME  # 也可以自己手写 "scoring"
 
-# 要监听的队列名，要跟 queue.py 里的一致
 QUEUE_NAMES = ["scoring"]
+
 
 def main():
     redis_conn = get_redis_connection()
-    with Connection(redis_conn):
-        worker = Worker(QUEUE_NAMES)
-        worker.work()
+
+    queues = [Queue(name, connection=redis_conn) for name in QUEUE_NAMES]
+
+    worker = Worker(queues, connection=redis_conn)
+
+    worker.work()
+
 
 if __name__ == "__main__":
     main()
