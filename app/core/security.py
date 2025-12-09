@@ -1,7 +1,6 @@
 # app/core/security.py
 from datetime import datetime, timedelta
 from typing import Optional
-import hashlib
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -13,8 +12,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 
-# 使用 pbkdf2 而不是 bcrypt 来避免长密码问题
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # 登录时，前端会在 /token (或 /auth/login) 获取 token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
@@ -25,8 +23,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
-    # 限制密码长度以避免 bcrypt 问题
-    password = password[:72]  # bcrypt 的限制是 72 字节
     return pwd_context.hash(password)
 
 
