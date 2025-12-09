@@ -11,7 +11,10 @@ os.environ['TRANSFORMERS_NO_TORCH'] = '0'  # Ensure PyTorch is used
 import argparse
 import torch
 from transformers import AutoTokenizer
-from train import MultiTaskCrossEncoder
+try:
+    from .train import MultiTaskCrossEncoder
+except ImportError:
+    from model_training.train import MultiTaskCrossEncoder
 import logging
 from typing import Dict, Tuple
 
@@ -51,26 +54,45 @@ class ScoringModel:
             use_features=use_features
         )
         
-        # Load weights
+        # Load weights - try different formats
+        loaded = False
+        
+        # Try pytorch_model.bin first
         model_file = f"{model_path}/pytorch_model.bin"
-        if not os.path.exists(model_file):
+        if os.path.exists(model_file):
+            try:
+                state_dict = torch.load(model_file, map_location=self.device)
+                self.model.load_state_dict(state_dict, strict=False)
+                loaded = True
+                logger.info("Loaded model from pytorch_model.bin")
+            except Exception as e:
+                logger.warning(f"Failed to load pytorch_model.bin: {e}")
+        
+        # Try model.safetensors
+        if not loaded:
             model_file = f"{model_path}/model.safetensors"
-            # If using safetensors, need to use safetensors library
             if os.path.exists(model_file):
                 try:
                     from safetensors.torch import load_file
                     state_dict = load_file(model_file)
-                    self.model.load_state_dict(state_dict, strict=False)
-                except ImportError:
-                    logger.warning("safetensors not installed, trying alternative loading method")
-                    # Try to load entire model directly
-                    self.model = torch.load(f"{model_path}/model.pt", map_location=self.device)
-        else:
-            state_dict = torch.load(model_file, map_location=self.device)
-            self.model.load_state_dict(state_dict, strict=False)
+                    # Load with strict=False to ignore missing/extra keys
+                    missing_keys, unexpected_keys = self.model.load_state_dict(state_dict, strict=False)
+                    if missing_keys:
+                        logger.warning(f"Missing keys: {missing_keys}")
+                    if unexpected_keys:
+                        logger.warning(f"Unexpected keys: {unexpected_keys}")
+                    loaded = True
+                    logger.info("Loaded model from model.safetensors")
+                except Exception as e:
+                    logger.error(f"Failed to load model.safetensors: {e}")
+                    raise
+        
+        if not loaded:
+            raise FileNotFoundError(f"No valid model file found in {model_path}")
         
         self.model.to(self.device)
         self.model.eval()
+        logger.info(f"Model moved to {self.device} and set to eval mode")
         
         # 5-class category names
         self.class_names = [

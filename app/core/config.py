@@ -6,9 +6,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Short Answer Grading Support System"
 
     # Database
-    DATABASE_URL: str = (
-        "postgresql+psycopg2://ee547_user:password@localhost:5432/ee547_db"
-    )
+    # 使用 SQLite 进行本地开发（无需 PostgreSQL）
+    DATABASE_URL: str = "sqlite:///./ee547.db"
 
     # JWT Authentication
     SECRET_KEY: str = "change-me-in-production-use-random-string"
@@ -28,7 +27,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # ML Model
-    ML_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    ML_MODEL_PATH: str = "./model_training/outputs/final_model"
+    ML_USE_FEATURES: bool = False
     ML_MODEL_VERSION: str = "1.0.0"
 
     class Config:
