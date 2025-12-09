@@ -4,7 +4,7 @@ ee547-final/
 │   ├── api/
 │   │   ├── v1/
 │   │   │   ├── endpoints/
-│   │   │   │   ├── auth.py          # 登录/注册（如果需要）
+│   │   │   │   ├── auth.py          # 登录/注册
 │   │   │   │   ├── users.py         # 教师/学生的基本信息
 │   │   │   │   ├── questions.py     # 题目相关接口（老师上传题目/参考答案）
 │   │   │   │   ├── submissions.py   # 学生提交答案、查看结果

@@ -7,9 +7,6 @@ from rq import Queue
 
 from app.core.config import settings
 
-# 可根据你的 .env / config 调整这里的属性名
-# 比如 .env 里写的是 QUEUE_URL=redis://redis:6379/0
-# 那 config.py 里通常会有 settings.QUEUE_URL
 _DEFAULT_QUEUE_NAME = "default"
 _SCORING_QUEUE_NAME = "scoring"
 
@@ -34,25 +31,7 @@ def enqueue_job(
     queue_name: str = _DEFAULT_QUEUE_NAME,
     **kwargs: Any,
 ) -> str:
-    """
-    封装一个通用的“入队”函数，方便以后有别的异步任务。
 
-    Parameters
-    ----------
-    func : Callable
-        需要在 worker 中执行的函数（必须可被 import）
-    *args :
-        传给 func 的位置参数
-    queue_name : str, optional
-        队列名，默认 "default"
-    **kwargs :
-        传给 func 的关键字参数
-
-    Returns
-    -------
-    str
-        RQ Job 的 ID（可以存数据库或日志，方便排查）
-    """
     q = get_queue(queue_name)
     job = q.enqueue(func, *args, **kwargs)
     return job.id
