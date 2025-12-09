@@ -12,7 +12,7 @@ from app.schemas.score import ScoreUpdate, ScorePublic
 from app.services import scoring_service, submission_service
 from app.core.security import get_current_teacher
 
-router = APIRouter(prefix="/scores", tags=["scores"])
+router = APIRouter(tags=["scores"])
 
 
 def _submission_to_score_public(sub: Submission) -> ScorePublic:

@@ -1,24 +1,26 @@
+// frontend/src/CreateQuestion.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const CreateQuestion = () => {
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    max_score: 100 // 默认满分100，匹配后端的整型字段
+    question_text: '',       // ✅ 对应后端 question_text
+    reference_answer: '',    // ✅ 对应后端 reference_answer
+    max_score: 5,
+    topic: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // 获取用户信息用于简单的权限判断（后端也会校验）
-  const userRole = localStorage.getItem('user_role'); // 假设登录时存了 role，如果没有存，后端也会拦截
+  const userRole = localStorage.getItem('user_role');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'max_score' ? parseInt(value) || 0 : value
+      [name]: name === 'max_score' ? parseInt(value) || 0 : value,
     }));
   };
 
@@ -35,13 +37,13 @@ const CreateQuestion = () => {
     }
 
     try {
-      // 这里的路径必须匹配后端 main.py / routers 定义的路径
       const response = await fetch('/api/v1/questions/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
+        // 这里直接发 formData，字段名和后端一一对应
         body: JSON.stringify(formData),
       });
 
@@ -51,8 +53,7 @@ const CreateQuestion = () => {
       }
 
       alert('Question created successfully!');
-      navigate('/'); // 创建成功后跳回主页或列表页
-
+      navigate('/');
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -65,10 +66,17 @@ const CreateQuestion = () => {
     <div className="card" style={{ maxWidth: '600px', margin: '2rem auto' }}>
       <h2>Teacher: Create New Question</h2>
 
-      {/* 简单的角色提示 */}
       {userRole !== 'teacher' && (
-        <div style={{ background: '#fffbe6', padding: '10px', marginBottom: '10px', border: '1px solid #ffe58f' }}>
-            ️ Warning: You may not have permission to perform this action if you are not a teacher.
+        <div
+          style={{
+            background: '#fffbe6',
+            padding: '10px',
+            marginBottom: '10px',
+            border: '1px solid #ffe58f',
+          }}
+        >
+          ⚠️ Warning: You may not have permission to perform this action if you are
+          not a teacher.
         </div>
       )}
 
@@ -83,20 +91,44 @@ const CreateQuestion = () => {
             required
             value={formData.title}
             onChange={handleChange}
-            placeholder="e.g., Homework 1: Linear Regression"
+            placeholder="e.g., Homework 1: Short Answer"
           />
         </div>
 
         <div className="form-group">
-          <label>Description</label>
+          <label>Question Text</label>
           <textarea
-            name="description"
+            name="question_text"
             required
-            rows="5"
-            value={formData.description}
+            rows="4"
+            value={formData.question_text}
             onChange={handleChange}
             placeholder="Enter the problem details..."
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Reference Answer</label>
+          <textarea
+            name="reference_answer"
+            required
+            rows="3"
+            value={formData.reference_answer}
+            onChange={handleChange}
+            placeholder="Enter the reference answer..."
+            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Topic (optional)</label>
+          <input
+            name="topic"
+            type="text"
+            value={formData.topic}
+            onChange={handleChange}
+            placeholder="e.g., NLP, Machine Learning"
           />
         </div>
 

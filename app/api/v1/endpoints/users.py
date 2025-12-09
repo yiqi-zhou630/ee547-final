@@ -7,7 +7,7 @@ from app.schemas.user import UserPublic
 from app.models.user import User
 from app.core.security import get_current_user
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(tags=["users"])
 
 
 @router.get("/me", response_model=UserPublic)

@@ -16,7 +16,7 @@ from app.schemas.submission import (
 from app.services import submission_service, scoring_service
 from app.core.security import get_current_student, get_current_teacher, get_current_user
 
-router = APIRouter(prefix="/submissions", tags=["submissions"])
+router = APIRouter(tags=["submissions"])
 
 
 @router.post("/", response_model=SubmissionPublic, status_code=status.HTTP_201_CREATED)

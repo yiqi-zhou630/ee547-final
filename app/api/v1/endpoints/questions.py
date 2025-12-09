@@ -15,7 +15,7 @@ from app.schemas.question import (
 from app.services import question_service
 from app.core.security import get_current_teacher, get_current_user
 
-router = APIRouter(prefix="/questions", tags=["questions"])
+router = APIRouter(tags=["questions"])
 
 
 @router.post("/", response_model=QuestionPublic, status_code=status.HTTP_201_CREATED)
