@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Short Answer Grading Support System"
 
     # Database
+    # Use PostgreSQL for production
     DATABASE_URL: str = (
         "postgresql+psycopg2://ee547_user:password@localhost:5432/ee547_db"
     )
