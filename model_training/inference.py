@@ -8,6 +8,13 @@ import os
 os.environ['TRANSFORMERS_NO_TF'] = '1'
 os.environ['TRANSFORMERS_NO_TORCH'] = '0'  # Ensure PyTorch is used
 
+# macOS specific: Force CPU to avoid Bus errors with MPS
+import platform
+if platform.system() == 'Darwin':
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
 import argparse
 import torch
 from transformers import AutoTokenizer
@@ -31,7 +38,33 @@ class ScoringModel:
         device: str = None,
         use_features: bool = False
     ):
-        self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+        # Device selection: Force CPU on macOS to avoid Bus errors with MPS
+        if device is None:
+            if platform.system() == 'Darwin':  # macOS
+                self.device = 'cpu'
+                logger.info("macOS detected: Forcing CPU device to avoid MPS Bus errors")
+                
+                # CRITICAL: Disable MPS completely on macOS
+                try:
+                    if hasattr(torch.backends, 'mps'):
+                        torch.backends.mps.is_available = lambda: False
+                        if hasattr(torch.backends.mps, 'is_built'):
+                            torch.backends.mps.is_built = lambda: False
+                except:
+                    pass
+                
+                try:
+                    torch.mps.is_available = lambda: False
+                    torch.mps.is_built = lambda: False
+                except:
+                    pass
+            elif torch.cuda.is_available():
+                self.device = 'cuda'
+            else:
+                self.device = 'cpu'
+        else:
+            self.device = device
+        
         self.use_features = use_features
         
         # Load tokenizer
@@ -74,7 +107,9 @@ class ScoringModel:
             if os.path.exists(model_file):
                 try:
                     from safetensors.torch import load_file
-                    state_dict = load_file(model_file)
+                    # Load to CPU first, then move to target device
+                    # This avoids Bus errors on macOS MPS
+                    state_dict = load_file(model_file, device='cpu')
                     # Load with strict=False to ignore missing/extra keys
                     missing_keys, unexpected_keys = self.model.load_state_dict(state_dict, strict=False)
                     if missing_keys:
@@ -120,6 +155,22 @@ class ScoringModel:
         Returns:
             Dictionary containing score and class
         """
+        # macOS specific: Aggressively disable MPS before inference (CRITICAL)
+        if platform.system() == 'Darwin':
+            try:
+                if hasattr(torch.backends, 'mps'):
+                    torch.backends.mps.is_available = lambda: False
+                    if hasattr(torch.backends.mps, 'is_built'):
+                        torch.backends.mps.is_built = lambda: False
+            except:
+                pass
+            
+            try:
+                torch.mps.is_available = lambda: False
+                torch.mps.is_built = lambda: False
+            except:
+                pass
+        
         # Build input
         text_a = f"{question} {reference_answer}"
         text_b = student_answer
@@ -134,19 +185,29 @@ class ScoringModel:
             return_tensors='pt'
         )
         
-        # Move to device
-        input_ids = encoded['input_ids'].to(self.device)
-        attention_mask = encoded['attention_mask'].to(self.device)
-        token_type_ids = encoded.get('token_type_ids', torch.zeros_like(input_ids)).to(self.device)
+        # Move to device (force CPU on macOS)
+        device = 'cpu' if platform.system() == 'Darwin' else self.device
+        input_ids = encoded['input_ids'].to(device)
+        attention_mask = encoded['attention_mask'].to(device)
+        token_type_ids = encoded.get('token_type_ids', torch.zeros_like(input_ids)).to(device)
         
         # Extract features (if used)
         features = None
         if self.use_features:
             features = self._extract_features(question, reference_answer, student_answer)
-            features = torch.tensor([features], dtype=torch.float32).to(self.device)
+            features = torch.tensor([features], dtype=torch.float32).to(device)
         
-        # Predict
+        # Predict with strong CPU enforcement
         with torch.no_grad():
+            # Ensure model is on CPU on macOS
+            if platform.system() == 'Darwin':
+                self.model = self.model.to('cpu')
+                # Final MPS disable before forward pass
+                try:
+                    torch.backends.mps.is_available = lambda: False
+                except:
+                    pass
+            
             outputs = self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
