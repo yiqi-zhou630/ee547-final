@@ -1,160 +1,106 @@
 # app/api/v1/endpoints/submissions.py
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.submission import Submission
-from app.models.question import Question
 from app.models.user import User
-from app.schemas.submission import SubmissionCreate, SubmissionUpdate, SubmissionPublic, SubmissionDetail
-from app.core.security import get_current_user, get_current_student, get_current_teacher
+from app.schemas.submission import (
+    SubmissionCreate,
+    SubmissionUpdate,
+    SubmissionPublic,
+    SubmissionDetail,
+)
+from app.services import submission_service, scoring_service
+from app.core.security import get_current_student, get_current_teacher, get_current_user
 
-router = APIRouter()
-
-
-@router.get("/", response_model=list[SubmissionPublic])
-def list_submissions(
-    skip: int = 0,
-    limit: int = 100,
-    question_id: int | None = None,
-    student_id: int | None = None,
-    status_filter: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取提交列表"""
-    query = db.query(Submission)
-
-    # 学生只能看自己的
-    if current_user.role == "student":
-        query = query.filter(Submission.student_id == current_user.id)
-    else:
-        # 教师可以筛选
-        if student_id:
-            query = query.filter(Submission.student_id == student_id)
-
-    if question_id:
-        query = query.filter(Submission.question_id == question_id)
-
-    if status_filter:
-        query = query.filter(Submission.status == status_filter)
-
-    submissions = query.offset(skip).limit(limit).all()
-    return submissions
-
-
-@router.get("/{submission_id}", response_model=SubmissionPublic)
-def get_submission(
-    submission_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取单个提交"""
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
-        )
-
-    # 学生只能看自己的
-    if current_user.role == "student" and submission.student_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your own submissions",
-        )
-
-    return submission
+router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
 @router.post("/", response_model=SubmissionPublic, status_code=status.HTTP_201_CREATED)
 def create_submission(
-    payload: SubmissionCreate,
-    background_tasks: BackgroundTasks,
+    obj_in: SubmissionCreate,
     db: Session = Depends(get_db),
     current_student: User = Depends(get_current_student),
 ):
-    """创建提交（仅学生）"""
-    # 检查题目是否存在
-    question = db.query(Question).filter(Question.id == payload.question_id).first()
-    if not question:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question not found",
-        )
-
-    submission = Submission(
-        **payload.model_dump(),
-        student_id=current_student.id,
-        status="pending_ml",
+    """
+    学生提交答案；会创建一条 submission 并入队 ML 打分任务。
+    """
+    sub = submission_service.create_submission_and_enqueue_task(
+        db, student=current_student, obj_in=obj_in
     )
+    return sub
 
-    db.add(submission)
-    db.commit()
-    db.refresh(submission)
 
-    # TODO: 加入评分队列
-    # background_tasks.add_task(enqueue_scoring_task, submission.id)
+@router.get("/me", response_model=List[SubmissionPublic])
+def list_my_submissions(
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    学生查看自己的所有提交。
+    """
+    subs = submission_service.list_submissions_for_student(
+        db, student=current_student, skip=skip, limit=limit
+    )
+    return subs
 
-    return submission
+
+@router.get("/{submission_id}", response_model=SubmissionPublic)
+def get_submission_for_student(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_student: User = Depends(get_current_student),
+):
+    """
+    学生查看自己的单条提交（不含 ML 细节）。
+    """
+    sub = submission_service.get_submission(db, submission_id)
+    if not sub or sub.student_id != current_student.id:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return sub
+
+
+@router.get("/teacher/{submission_id}", response_model=SubmissionDetail)
+def get_submission_for_teacher(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_teacher: User = Depends(get_current_teacher),
+):
+    """
+    老师查看某条提交的详细信息（包含 ML 结果）。
+    """
+    sub = submission_service.get_submission(db, submission_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    # 权限：这条 submission 对应的题目必须是当前老师的
+    question = scoring_service._get_submission_and_question(db, submission_id)[1]
+    if question.teacher_id != current_teacher.id:
+        raise HTTPException(status_code=403, detail="Not allowed to view this submission")
+
+    return sub
 
 
 @router.put("/{submission_id}", response_model=SubmissionPublic)
-def update_submission(
+def update_submission_answer(
     submission_id: int,
-    payload: SubmissionUpdate,
+    obj_in: SubmissionUpdate,
     db: Session = Depends(get_db),
     current_student: User = Depends(get_current_student),
 ):
-    """更新提交（仅学生，且只能更新 pending_ml 状态的）"""
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
+    sub = submission_service.get_submission(db, submission_id)
+    if not sub or sub.student_id != current_student.id:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if sub.status != "pending_ml":
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            status_code=400, detail="Cannot edit submission after ML scoring started"
         )
 
-    if submission.student_id != current_student.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own submissions",
-        )
-
-    if submission.status != "pending_ml":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update submission after ML scoring",
-        )
-
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(submission, key, value)
-
-    db.commit()
-    db.refresh(submission)
-    return submission
-
-
-@router.delete("/{submission_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_submission(
-    submission_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """删除提交"""
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
-        )
-
-    # 学生只能删除自己的
-    if current_user.role == "student" and submission.student_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own submissions",
-        )
-
-    db.delete(submission)
-    db.commit()
-    return None
+    sub = submission_service.update_submission_answer(db, db_obj=sub, obj_in=obj_in)
+    return sub
