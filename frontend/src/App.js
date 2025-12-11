@@ -179,6 +179,8 @@ const UploadCard = ({ questions, onSubmit }) => {
   const [txt, setTxt] = useState('');
   const [sub, setSub] = useState(false);
 
+  const selectedQuestion = questions.find(q => q.id === Number(qId));
+
   const hSub = async (e) => {
     e.preventDefault();
     if (!qId || !txt) return;
@@ -210,6 +212,27 @@ const UploadCard = ({ questions, onSubmit }) => {
           </select>
         </div>
 
+        {selectedQuestion && (
+          <div
+            className="question-preview"
+            style={{
+              background: '#fafafa',
+              border: '1px solid #eee',
+              borderRadius: 4,
+              padding: '8px 10px',
+              marginBottom: 12,
+              fontSize: '0.9rem',
+              textAlign: 'left',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+              {selectedQuestion.title}
+            </div>
+            <div>{selectedQuestion.question_text}</div>
+          </div>
+        )}
+
         <div className="form-group">
           <label>Answer</label>
           <textarea
@@ -228,6 +251,7 @@ const UploadCard = ({ questions, onSubmit }) => {
     </section>
   );
 };
+
 
 const StatusBadge = ({ status }) => {
   const c =
@@ -292,8 +316,6 @@ const HistoryList = ({ submissions, questions, loading }) => {
     </section>
   );
 };
-
-// ================= 新增：老师改分面板 =================
 
 // ================= 主逻辑组件 =================
 function AppContent() {
@@ -513,6 +535,7 @@ function AppContent() {
 
                 <TeacherGradingPanel
                   pendingScores={pendingScores}
+                  questions={questions}
                   onSubmitGrade={handleSubmitGrade}
                   loading={gradingLoading}
                 />

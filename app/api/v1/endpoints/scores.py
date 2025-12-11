@@ -20,6 +20,7 @@ def _submission_to_score_public(sub: Submission) -> ScorePublic:
         submission_id=sub.id,
         question_id=sub.question_id,
         student_id=sub.student_id,
+        answer_text=sub.answer_text,
         ml_score=sub.ml_score,
         ml_label=sub.ml_label,
         ml_confidence=sub.ml_confidence,

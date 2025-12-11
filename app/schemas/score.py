@@ -15,6 +15,8 @@ class ScorePublic(BaseModel):
     question_id: int
     student_id: int
 
+    answer_text: str | None = None
+
     # ML scoring
     ml_score: Decimal | None = None
     ml_label: str | None = None

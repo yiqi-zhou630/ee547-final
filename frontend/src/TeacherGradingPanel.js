@@ -1,7 +1,6 @@
 // frontend/src/TeacherGradingPanel.js
 import React, { useState } from 'react';
 
-// 这里单独搞一个本地的 StatusBadge，不跟学生那边的混用也没问题
 const LocalStatusBadge = ({ status }) => {
   const c =
     {
@@ -24,14 +23,10 @@ const LocalStatusBadge = ({ status }) => {
   );
 };
 
-/**
- * 老师改分面板：
- * - pendingScores: 后端 /scores/pending 返回的数组
- * - onSubmitGrade: (submissionId, finalScore, comment) => Promise
- * - loading: 是否在加载中（可以绑定到按钮 / 文本）
- */
-const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
-  const [editing, setEditing] = useState({}); // { [submission_id]: { final_score, teacher_comment } }
+const TeacherGradingPanel = ({ pendingScores, questions, onSubmitGrade, loading }) => {
+  const [editing, setEditing] = useState({});
+
+  const getQuestion = (qid) => questions.find((q) => q.id === qid);
 
   const handleChange = (submissionId, field, value) => {
     setEditing((prev) => ({
@@ -54,8 +49,6 @@ const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
     }
 
     await onSubmitGrade(submissionId, parseFloat(finalScore), teacherComment);
-
-    // 保存成功后，清掉本行的临时编辑状态
     setEditing((prev) => {
       const cp = { ...prev };
       delete cp[submissionId];
@@ -74,9 +67,10 @@ const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
         <table className="history-table">
           <thead>
             <tr>
-              <th>Submission ID</th>
-              <th>Question ID</th>
-              <th>Student ID</th>
+              <th>Submission</th>
+              <th>Question</th>
+              <th>Student</th>
+              <th>Student Answer</th>
               <th>Status</th>
               <th>ML Score</th>
               <th>Final Score</th>
@@ -87,19 +81,62 @@ const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
           <tbody>
             {pendingScores.map((s) => {
               const edit = editing[s.submission_id] || {};
+              const q = getQuestion(s.question_id);
+
               return (
                 <tr key={s.submission_id}>
                   <td>{s.submission_id}</td>
-                  <td>{s.question_id}</td>
+
+                  <td>
+                    <div style={{ fontWeight: 'bold' }}>
+                      {q?.title || `Q#${s.question_id}`}
+                    </div>
+                    {q?.question_text && (
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          color: '#666',
+                          marginTop: 2,
+                          maxWidth: 260,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={q.question_text}
+                      >
+                        {q.question_text}
+                      </div>
+                    )}
+                  </td>
+
                   <td>{s.student_id}</td>
+
+                  <td>
+                    <div
+                      style={{
+                        maxWidth: 260,
+                        maxHeight: 80,
+                        overflow: 'auto',
+                        fontSize: '0.85rem',
+                        whiteSpace: 'pre-wrap',
+                        border: '1px dashed #ddd',
+                        padding: '4px 6px',
+                      }}
+                    >
+                      {s.answer_text || '(no answer text)'}
+                    </div>
+                  </td>
+
                   <td>
                     <LocalStatusBadge status={s.status} />
                   </td>
+
                   <td>
                     {s.ml_score != null
                       ? `${s.ml_score} ${s.ml_label ? `(${s.ml_label})` : ''}`
                       : '--'}
                   </td>
+
                   <td>
                     <input
                       type="number"
@@ -118,6 +155,7 @@ const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
                       }
                     />
                   </td>
+
                   <td>
                     <input
                       type="text"
@@ -137,6 +175,7 @@ const TeacherGradingPanel = ({ pendingScores, onSubmitGrade, loading }) => {
                       }
                     />
                   </td>
+
                   <td>
                     <button
                       className="btn-submit"
